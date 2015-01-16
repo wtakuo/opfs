@@ -1,0 +1,7 @@
+opfs
+types.h
+fs.h
+*.o
+*~
+a.out
+.DS_Store
