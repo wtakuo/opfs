@@ -1137,7 +1137,7 @@ int main(int argc, char *argv[]) {
         error("Commands are:\n");
         for (int i = 0; cmd_table[i].name != NULL; i++)
             error("    %s %s\n", cmd_table[i].name, cmd_table[i].args);
-
+        return EXIT_FAILURE;
     }
     char *img_file = argv[1];
     char *cmd = argv[2];
