@@ -328,12 +328,17 @@ int iread(img_t img, inode_t ip, uchar *buf, uint n, uint off) {
         n = ip->size - off;
     // t : total bytes that have been read
     // m : last bytes that were read
-    for (uint t = 0, m = 0; t < n; t += m, off += m, buf += m) {
-        uchar *bp = img[bmap(img, ip, off / BSIZE)];
+    uint t = 0;
+    for (uint m = 0; t < n; t += m, off += m, buf += m) {
+        uint b = bmap(img, ip, off / BSIZE);
+        if (!valid_data_block(img, b)) {
+            derror("iread: %u: invalid data block\n", b);
+            break;
+        }
         m = min(n - t, BSIZE - off % BSIZE);
-        memmove(buf, bp + off % BSIZE, m);
+        memmove(buf, img[b] + off % BSIZE, m);
     }
-    return n;
+    return t;
 }
 
 // writes n byte of data to the file specified by ip
@@ -344,14 +349,19 @@ int iwrite(img_t img, inode_t ip, uchar *buf, uint n, uint off) {
         return -1;
     // t : total bytes that have been written
     // m : last bytes that were written
-    for (uint t = 0, m = 0; t < n; t += m, off += m, buf += m) {
-        uchar *bp = img[bmap(img, ip, off / BSIZE)];
+    uint t = 0;
+    for (uint m = 0; t < n; t += m, off += m, buf += m) {
+        uint b = bmap(img, ip, off / BSIZE);
+        if (!valid_data_block(img, b)) {
+            derror("iwrite: %u: invalid data block\n", b);
+            break;
+        }
         m = min(n - t, BSIZE - off % BSIZE);
-        memmove(bp + off % BSIZE, buf, m);
+        memmove(img[b] + off % BSIZE, buf, m);
     }
-    if (n > 0 && off > ip->size)
+    if (t > 0 && off > ip->size)
         ip->size = off;
-    return n;
+    return t;
 }
 
 // truncate the file specified by ip to size
@@ -366,8 +376,10 @@ int itruncate(img_t img, inode_t ip, uint size) {
         int k = divceil(size, BSIZE);      // # of blocks to keep
         int nd = min(n, NDIRECT);          // # of used direct blocks
         int kd = min(k, NDIRECT);          // # of direct blocks to keep
-        for (int i = kd; i < nd; i++)
+        for (int i = kd; i < nd; i++) {
             bfree(img, ip->addrs[i]);
+            ip->addrs[i] = 0;
+        }
 
         if (n > NDIRECT) {
             uint iaddr = ip->addrs[NDIRECT];
@@ -375,10 +387,14 @@ int itruncate(img_t img, inode_t ip, uint size) {
             uint *iblock = (uint *)img[iaddr];
             int ni = max(n - NDIRECT, 0);  // # of used indirect blocks
             int ki = max(k - NDIRECT, 0);  // # of indirect blocks to keep
-            for (uint i = ki; i < ni; i++)
+            for (uint i = ki; i < ni; i++) {
                 bfree(img, iblock[i]);
-            if (ki == 0)
+                iblock[i] = 0;
+            }
+            if (ki == 0) {
                 bfree(img, iaddr);
+                ip->addrs[NDIRECT] = 0;
+            }
         }
     }
     else {
@@ -558,7 +574,7 @@ int iunlink(img_t img, inode_t dp, char *path) {
     assert(path != NULL);
     char name[DIRSIZ + 1];
     name[DIRSIZ] = 0;
-    while (1) {
+    while (true) {
         path = skipelem(path, name);
         if (is_empty(name)) {
             derror("iunlink: empty file name\n");
