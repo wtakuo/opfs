@@ -1,6 +1,9 @@
 opfs
 types.h
 fs.h
+GTAGS
+GRTAGS
+GPATH
 *.o
 *~
 a.out

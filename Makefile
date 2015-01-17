@@ -7,6 +7,8 @@ SRCS = opfs.c
 OBJS = $(SRCS:%.c=%.o)
 EXES = opfs
 
+TAGFILES = GTAGS GRTAGS GPATH
+
 XV6HOME = $(HOME)/xv6
 XV6HDRS = types.h fs.h
 
@@ -18,6 +20,7 @@ OPTFLAGS =
 
 RM = rm -f
 CP = cp
+GTAGS = gtags
 
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(OPTFLAGS) -c $<
@@ -35,10 +38,15 @@ $(XV6HDRS): $(XV6HOME)
 	$(CP) $(XV6HOME)/types.h .
 	$(CP) $(XV6HOME)/fs.h .
 
+tags: $(HDRS) $(SRCS)
+	$(GTAGS) -v
+
 clean:
 	$(RM) $(EXES)
 	$(RM) $(OBJS)
 
 allclean: clean
 	$(RM) $(XV6HDRS)
+	$(RM) $(TAGFILES)
 	$(RM) a.out *.o *~ .*~
+
