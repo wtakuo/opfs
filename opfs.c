@@ -142,7 +142,7 @@ static uint bitcount(uint x) {
 
 // program name
 char *progname;
-jmp_buf exception_buf;
+jmp_buf fatal_exception_buf;
 
 #define ddebug(...) debug_message("DEBUG", __VA_ARGS__)
 #define derror(...) debug_message("ERROR", __VA_ARGS__)
@@ -168,9 +168,10 @@ void error(const char *fmt, ...) {
 void fatal(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
+    fprintf(stderr, "FATAL: ");
     vfprintf(stderr, fmt, args);
     va_end(args);
-    longjmp(exception_buf, 1);
+    longjmp(fatal_exception_buf, 1);
 }
 
 
@@ -203,8 +204,8 @@ uint balloc(img_t img) {
             if ((bp[bi / 8] & m) == 0) {
                 bp[bi / 8] |= m;
                 if (!valid_data_block(img, b + bi)) {
-                    derror("balloc: %u: invalid data block number\n", b + bi);
-                    return 0;
+                    fatal("balloc: %u: invalid data block number\n", b + bi);
+                    return 0; // dummy
                 }
                 memset(img[b + bi], 0, BSIZE);
                 return b + bi;
@@ -212,24 +213,22 @@ uint balloc(img_t img) {
         }
     }
     fatal("balloc: no free blocks\n");
-    return 0;
+    return 0; // dummy
 }
 
 // frees the block specified by b
-uint bfree(img_t img, uint b) {
+int bfree(img_t img, uint b) {
     if (!valid_data_block(img, b)) {
         derror("bfree: %u: invalid data block number\n", b);
-        return 0;
+        return -1;
     }
     uchar *bp = img[BBLOCK(b, SBLK(img)->ninodes)];
     int bi = b % BPB;
     int m = 1 << (bi % 8);
-    if ((bp[bi / 8] & m) == 0) {
-        dwarn("bfree: already freed block: %u\n", b);
-        return 0;
-    }
+    if ((bp[bi / 8] & m) == 0)
+        dwarn("bfree: %u: already freed block\n", b);
     bp[bi / 8] &= ~m;
-    return b;
+    return 0;
 }
 
 
@@ -279,13 +278,16 @@ inode_t ialloc(img_t img, uint type) {
 }
 
 // frees inum-th inode
-void ifree(img_t img, uint inum) {
+int ifree(img_t img, uint inum) {
     inode_t ip = iget(img, inum);
+    if (ip == NULL)
+        return -1;
     if (ip->type == 0)
         dwarn("ifree: inode #%d is already freed\n", inum);
     if (ip->nlink > 0)
         dwarn("ifree: nlink of inode #%d is not zero\n", inum);
     ip->type = 0;
+    return 0;
 }
 
 // returns n-th data block number of the file specified by ip
@@ -308,8 +310,6 @@ uint bmap(img_t img, inode_t ip, uint n) {
         if (iaddr == 0) {
             iaddr = balloc(img);
             ip->addrs[NDIRECT] = iaddr;
-            if (iaddr == 0)
-                return 0;
         }
         uint *iblock = (uint *)img[iaddr];
         if (iblock[k] == 0)
@@ -450,7 +450,7 @@ inode_t dirlookup(img_t img, inode_t dp, char *name, uint *offp) {
     struct dirent de;
     for (uint off = 0; off < dp->size; off += sizeof(de)) {
         if (iread(img, dp, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
-            derror("dirlookup: %s: read failed\n", name);
+            derror("dirlookup: %s: read error\n", name);
             return NULL;
         }
         if (strncmp(name, de.name, DIRSIZ) == 0) {
@@ -531,8 +531,6 @@ inode_t icreat(img_t img, inode_t dp, char *path, uint type, inode_t *dpp) {
         if (is_empty(path)) {
             if (ip == NULL) {
                 ip = ialloc(img, type);
-                if (ip == NULL)
-                    return NULL;
                 if (dpp != NULL)
                     *dpp = dp;
                 addent(img, dp, name, ip);
@@ -568,7 +566,7 @@ int iunlink(img_t img, inode_t dp, char *path) {
     while (1) {
         path = skipelem(path, name);
         if (is_empty(name)) {
-            derror("iunlink: empty name\n");
+            derror("iunlink: empty file name\n");
             return -1;
         }
         uint off;
@@ -662,7 +660,7 @@ int do_info(img_t img, int argc, char *argv[]) {
 
     inode_t ip = ilookup(img, root_inode, path);
     if (ip == NULL) {
-        fprintf(stderr, "info: no such file or directory: %s\n", path);
+        error("info: no such file or directory: %s\n", path);
         return EXIT_FAILURE;
     }
     printf("inode: %d\n", geti(img, ip));
@@ -784,7 +782,7 @@ int do_put(img_t img, int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
         if (iwrite(img, ip, buf, n, off) != n) {
-            error("put: %s: write failed\n", path);
+            error("put: %s: write error\n", path);
             return EXIT_FAILURE;
         }
         if (n < BUFSIZE)
@@ -812,7 +810,7 @@ int do_rm(img_t img, int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
     if (iunlink(img, root_inode, path) < 0) {
-        error("rm: %s: unlink failed\n", path);
+        error("rm: %s: cannot unlink\n", path);
         return EXIT_FAILURE;
     }
 
@@ -886,11 +884,11 @@ int do_cp(img_t img, int argc, char *argv[]) {
     for (uint off = 0; off < sip->size; off += BUFSIZE) {
         int n = iread(img, sip, buf, BUFSIZE, off);
         if (n < 0) {
-            error("cp: %s: read failure\n", spath);
+            error("cp: %s: read error\n", spath);
             return EXIT_FAILURE;
         }
         if (iwrite(img, dip, buf, n, off) != n) {
-            error("cp: %s: write failure\n", dpath);
+            error("cp: %s: write error\n", dpath);
             return EXIT_FAILURE;
         }
     }
@@ -1084,7 +1082,7 @@ int do_rmdir(img_t img, int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
     if (iunlink(img, root_inode, path) < 0) {
-        error("rmdir: %s: unlink failed\n", path);
+        error("rmdir: %s: cannot unlink\n", path);
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
@@ -1158,8 +1156,8 @@ int main(int argc, char *argv[]) {
     root_inode = iget(img, root_inode_number);
 
     // shift argc and argv to point the first command argument
-    int status = EXIT_SUCCESS;
-    if (setjmp(exception_buf) == 0)
+    int status = EXIT_FAILURE;
+    if (setjmp(fatal_exception_buf) == 0)
         status = exec_cmd(img, cmd, argc - 3, argv + 3);
 
     munmap(img, img_size);
