@@ -489,25 +489,20 @@ inode_t ilookup(img_t img, inode_t dp, char *path) {
 
 // add a new directory entry in dp
 int addent(img_t img, inode_t dp, char *name, inode_t ip) {
-    struct dirent de, df;
-    memmove(de.name, name, DIRSIZ);
-    de.inum = geti(img, ip);
-    for (uint off = 0; off < dp->size; off += sizeof(df)) {
-        if (iread(img, dp, (uchar *)&df, sizeof(df), off) != sizeof(df)) {
+    struct dirent de;
+    uint off;
+    // try to find an empty entry
+    for (off = 0; off < dp->size; off += sizeof(de)) {
+        if (iread(img, dp, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
             derror("addent: %u: read error\n", geti(img, dp));
             return -1;
         }
-        if (df.inum == 0) {
-            if (iwrite(img, dp, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
-                derror("addent: %u: write error\n", geti(img, dp));
-                return -1;
-            }
-            if (strncmp(name, ".", DIRSIZ) != 0)
-                ip->nlink++;
-            return 0;
-        }
+        if (de.inum == 0)
+            break;
     }
-    if (iwrite(img, dp, (uchar *)&de, sizeof(de), dp->size) != sizeof(de)) {
+    strncpy(de.name, name, DIRSIZ);
+    de.inum = geti(img, ip);
+    if (iwrite(img, dp, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
         derror("addent: %u: write error\n", geti(img, dp));
         return -1;
     }
