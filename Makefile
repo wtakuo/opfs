@@ -12,7 +12,7 @@ TAGFILES = GTAGS GRTAGS GPATH
 XV6HOME = $(HOME)/xv6
 XV6HDRS = types.h fs.h
 
-CC = clang
+CC = gcc
 CFLAGS = -std=c99 -pedantic -Wall -Werror
 CPPFLAGS = # -DNDEBUG
 LDFLAGS =

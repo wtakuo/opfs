@@ -686,7 +686,7 @@ int do_diskinfo(img_t img, int argc, char *argv[]) {
            Ni + Nm + 2, Ni + Nm + Nd + 1, Nd);
     printf("log blocks: #%d-#%d (%d blocks)\n",
            Ni + Nm + Nd + 2, Ni + Nm + Nd + Nl + 1, Nl);
-    printf("maximum file size (bytes): %ld\n", MAXFILESIZE);
+    printf("maximum file size (bytes): %u\n", MAXFILESIZE);
 
     int nblocks = 0;
     for (uint b = Ni + 2; b <= Ni + Nm + 1; b++)
