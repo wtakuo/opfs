@@ -174,6 +174,19 @@ void fatal(const char *fmt, ...) {
     longjmp(fatal_exception_buf, 1);
 }
 
+char *typename(int type) {
+    switch (type) {
+    case T_DIR:
+        return "directory";
+    case T_FILE:
+        return "file";
+    case T_DEV:
+        return "device";
+    default:
+        return "unknown";
+    }
+}
+
 
 /*
  * Basic operations on blocks
@@ -461,12 +474,12 @@ char *splitpath(char *path, char *dirbuf, uint size) {
  */
 
 // search a file (name) in a directory (dp)
-inode_t dirlookup(img_t img, inode_t dp, char *name, uint *offp) {
+inode_t dlookup(img_t img, inode_t dp, char *name, uint *offp) {
     assert(dp->type == T_DIR);
     struct dirent de;
     for (uint off = 0; off < dp->size; off += sizeof(de)) {
         if (iread(img, dp, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
-            derror("dirlookup: %s: read error\n", name);
+            derror("dlookup: %s: read error\n", name);
             return NULL;
         }
         if (strncmp(name, de.name, DIRSIZ) == 0) {
@@ -478,19 +491,71 @@ inode_t dirlookup(img_t img, inode_t dp, char *name, uint *offp) {
     return NULL;
 }
 
-// returns the inode number of a file (dp/path)
-inode_t ilookup(img_t img, inode_t dp, char *path) {
-    assert(path != NULL);
+// add a new directory entry in dp
+int daddent(img_t img, inode_t dp, char *name, inode_t ip) {
+    struct dirent de;
+    uint off;
+    // try to find an empty entry
+    for (off = 0; off < dp->size; off += sizeof(de)) {
+        if (iread(img, dp, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
+            derror("daddent: %u: read error\n", geti(img, dp));
+            return -1;
+        }
+        if (de.inum == 0)
+            break;
+        if (strncmp(de.name, name, DIRSIZ) == 0) {
+            derror("daddent: %s: exists\n", name);
+            return -1;
+        }
+    }
+    strncpy(de.name, name, DIRSIZ);
+    de.inum = geti(img, ip);
+    if (iwrite(img, dp, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
+        derror("daddent: %u: write error\n", geti(img, dp));
+        return -1;
+    }
+    if (strncmp(name, ".", DIRSIZ) != 0)
+        ip->nlink++;
+    return 0;
+}
+
+// create a link to the parent directory
+int dmkparlink(img_t img, inode_t pip, inode_t cip) {
+    if (pip->type != T_DIR) {
+        derror("dmkparlink: %d: not a directory\n", geti(img, pip));
+        return -1;
+    }
+    if (cip->type != T_DIR) {
+        derror("dmkparlink: %d: not a directory\n", geti(img, cip));
+        return -1;
+    }
+    uint off;
+    dlookup(img, cip, "..", &off);
+    struct dirent de;
+    de.inum = geti(img, pip);
+    strncpy(de.name, "..", DIRSIZ);
+    if (iwrite(img, cip, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
+        derror("dmkparlink: write error\n");
+        return -1;
+    }
+    pip->nlink++;
+    return 0;
+}
+
+
+// returns the inode number of a file (rp/path)
+inode_t ilookup(img_t img, inode_t rp, char *path) {
     char name[DIRSIZ + 1];
     name[DIRSIZ] = 0;
     while (true) {
+        assert(path != NULL && rp != NULL && rp->type == T_DIR);
         path = skipelem(path, name);
-        // if path is empty (or is a sequence of path separators),
-        // it should specify the direcotry (dp) itself
+        // if path is empty (or a sequence of path separators),
+        // it should specify the root direcotry (rp) itself
         if (is_empty(name))
-            return dp;
+            return rp;
 
-        inode_t ip = dirlookup(img, dp, name, NULL);
+        inode_t ip = dlookup(img, rp, name, NULL);
         if (ip == NULL)
             return NULL;
         if (is_empty(path))
@@ -499,61 +564,43 @@ inode_t ilookup(img_t img, inode_t dp, char *path) {
             derror("ilookup: %s: not a directory\n", name);
             return NULL;
         }
-        dp = ip;
+        rp = ip;
     }
 }
 
-// add a new directory entry in dp
-int addent(img_t img, inode_t dp, char *name, inode_t ip) {
-    struct dirent de;
-    uint off;
-    // try to find an empty entry
-    for (off = 0; off < dp->size; off += sizeof(de)) {
-        if (iread(img, dp, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
-            derror("addent: %u: read error\n", geti(img, dp));
-            return -1;
-        }
-        if (de.inum == 0)
-            break;
-    }
-    strncpy(de.name, name, DIRSIZ);
-    de.inum = geti(img, ip);
-    if (iwrite(img, dp, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
-        derror("addent: %u: write error\n", geti(img, dp));
-        return -1;
-    }
-    if (strncmp(name, ".", DIRSIZ) != 0)
-        ip->nlink++;
-    return 0;
-}
-
-// create a file (dp/path)
-inode_t icreat(img_t img, inode_t dp, char *path, uint type, inode_t *dpp) {
-    assert(path != NULL);
+// create a file
+inode_t icreat(img_t img, inode_t rp, char *path, uint type, inode_t *dpp) {
     char name[DIRSIZ + 1];
     name[DIRSIZ] = 0;
     while (true) {
+        assert(path != NULL && rp != NULL && rp->type == T_DIR);
         path = skipelem(path, name);
         if (is_empty(name)) {
             derror("icreat: %s: empty file name\n", path);
             return NULL;
         }
-        inode_t ip = dirlookup(img, dp, name, NULL);
+
+        inode_t ip = dlookup(img, rp, name, NULL);
         if (is_empty(path)) {
-            if (ip == NULL) {
-                ip = ialloc(img, type);
-                if (dpp != NULL)
-                    *dpp = dp;
-                addent(img, dp, name, ip);
-                return ip;
+            if (ip != NULL) {
+                derror("icreat: %s: file exists\n", name);
+                return NULL;
             }
-            if (ip->type == T_FILE)
-                return ip;
+            ip = ialloc(img, type);
+            daddent(img, rp, name, ip);
+            if (ip->type == T_DIR) {
+                daddent(img, ip, ".", ip);
+                daddent(img, ip, "..", rp);
+            }
+            if (dpp != NULL)
+                *dpp = rp;
+            return ip;
+        }
+        if (ip == NULL || ip->type != T_DIR) {
+            derror("icreat: %s: no such directory\n", name);
             return NULL;
         }
-        if (ip == NULL || ip->type != T_DIR)
-            return NULL;
-        dp = ip;
+        rp = ip;
     }
 }
 
@@ -570,29 +617,33 @@ bool emptydir(img_t img, inode_t dp) {
 }
 
 // unlinks a file (dp/path)
-int iunlink(img_t img, inode_t dp, char *path) {
-    assert(path != NULL);
+int iunlink(img_t img, inode_t rp, char *path) {
     char name[DIRSIZ + 1];
     name[DIRSIZ] = 0;
     while (true) {
+        assert(path != NULL && rp != NULL && rp->type == T_DIR);
         path = skipelem(path, name);
         if (is_empty(name)) {
             derror("iunlink: empty file name\n");
             return -1;
         }
         uint off;
-        inode_t ip = dirlookup(img, dp, name, &off);
+        inode_t ip = dlookup(img, rp, name, &off);
         if (ip != NULL && is_empty(path)) {
-            if (ip->type == T_DIR && !emptydir(img, ip))
-                return -1;
             if (strncmp(name, ".", DIRSIZ) == 0 ||
-                strncmp(name, "..", DIRSIZ) == 0)
+                strncmp(name, "..", DIRSIZ) == 0) {
+                derror("iunlink: cannot unlink \".\" or \"..\"\n");
                 return -1;
-            uchar zeroent[sizeof(struct dirent)];
-            memset(zeroent, 0, sizeof(struct dirent));
-            iwrite(img, dp, zeroent, sizeof(zeroent), off);
-            if (ip->type == T_DIR)
-                dp->nlink--;
+            }
+            // erase the directory entry
+            uchar zero[sizeof(struct dirent)];
+            memset(zero, 0, sizeof(zero));
+            if (iwrite(img, rp, zero, sizeof(zero), off) != sizeof(zero)) {
+                derror("iunlink: write error\n");
+                return -1;
+            }
+            if (ip->type == T_DIR && dlookup(img, ip, "..", NULL) == rp)
+                rp->nlink--;
             ip->nlink--;
             if (ip->nlink == 0) {
                 if (ip->type != T_DEV)
@@ -601,9 +652,11 @@ int iunlink(img_t img, inode_t dp, char *path) {
             }
             return 0;
         }
-        if (ip == NULL || ip->type != T_DIR)
+        if (ip == NULL || ip->type != T_DIR) {
+            derror("iunlink: %s: no such directory\n", name);
             return -1;
-        dp = ip;
+        }
+        rp = ip;
     }
 }
 
@@ -675,7 +728,7 @@ int do_info(img_t img, int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
     printf("inode: %d\n", geti(img, ip));
-    printf("type: %d\n", ip->type);
+    printf("type: %d (%s)\n", ip->type, typename(ip->type));
     printf("nlink: %d\n", ip->nlink);
     printf("size: %d\n", ip->size);
     if (ip->size > 0) {
@@ -799,7 +852,6 @@ int do_put(img_t img, int argc, char *argv[]) {
         if (n < BUFSIZE)
             break;
     }
-
     return EXIT_SUCCESS;
 }
 
@@ -824,7 +876,6 @@ int do_rm(img_t img, int argc, char *argv[]) {
         error("rm: %s: cannot unlink\n", path);
         return EXIT_FAILURE;
     }
-
     return EXIT_SUCCESS;
 }
 
@@ -839,7 +890,6 @@ int do_cp(img_t img, int argc, char *argv[]) {
 
     // source
     inode_t sip = ilookup(img, root_inode, spath);
-    char *sname = splitpath(spath, NULL, 0);
     if (sip == NULL) {
         error("cp: %s: no such file or directory\n", spath);
         return EXIT_FAILURE;
@@ -875,6 +925,7 @@ int do_cp(img_t img, int argc, char *argv[]) {
     }
     else {
         if (dip->type == T_DIR) {
+            char *sname = splitpath(spath, NULL, 0);
             inode_t fp = icreat(img, dip, sname, T_FILE, NULL);
             if (fp == NULL) {
                 error("cp: %s/%s: cannot create\n", dpath, sname);
@@ -891,6 +942,7 @@ int do_cp(img_t img, int argc, char *argv[]) {
         }
     }
 
+    // sip : source file inode, dip : destination file inode
     uchar buf[BUFSIZE];
     for (uint off = 0; off < sip->size; off += BUFSIZE) {
         int n = iread(img, sip, buf, BUFSIZE, off);
@@ -918,7 +970,6 @@ int do_mv(img_t img, int argc, char *argv[]) {
 
     // source
     inode_t sip = ilookup(img, root_inode, spath);
-    char *sname = splitpath(dpath, NULL, 0);
     if (sip == NULL) {
         error("mv: %s: no such file or directory\n", spath);
         return EXIT_FAILURE;
@@ -928,12 +979,72 @@ int do_mv(img_t img, int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    // destination
     inode_t dip = ilookup(img, root_inode, dpath);
     char ddir[BUFSIZE];
     char *dname = splitpath(dpath, ddir, BUFSIZE);
-    char *dirname = ddir;
-    if (dip == NULL) {
+    if (dip != NULL) {
+        if (dip->type == T_DIR) {
+            char *sname = splitpath(spath, NULL, 0);
+            inode_t ip = dlookup(img, dip, sname, NULL);
+            // ip : inode of dpath/sname
+            if (ip != NULL) {
+                if (ip->type == T_DIR) {
+                    // override existing empty directory
+                    if (sip->type != T_DIR) {
+                        error("mv: %s: not a directory\n", spath);
+                        return EXIT_FAILURE;
+                    }
+                    if (!emptydir(img, ip)) {
+                        error("mv: %s/%s: not empty\n", ddir, sname);
+                        return EXIT_FAILURE;
+                    }
+                    iunlink(img, dip, sname);
+                    daddent(img, dip, sname, sip);
+                    iunlink(img, root_inode, spath);
+                    dmkparlink(img, dip, sip);
+                    return EXIT_SUCCESS;
+                }
+                else if (ip->type == T_FILE) {
+                    // override existing file
+                    if (sip->type != T_FILE) {
+                        error("mv: %s: directory or device\n", spath);
+                        return EXIT_FAILURE;
+                    }
+                    iunlink(img, dip, sname);
+                    daddent(img, dip, sname, sip);
+                    iunlink(img, root_inode, spath);
+                    return EXIT_SUCCESS;
+                }
+                else {
+                    error("mv: %s: device\n", dpath);
+                    return EXIT_FAILURE;
+                }
+            }
+            else { // ip == NULL
+                daddent(img, dip, sname, sip);
+                iunlink(img, root_inode, spath);
+                if (sip->type == T_DIR)
+                    dmkparlink(img, dip, sip);
+            }
+        }
+        else if (dip->type == T_FILE) {
+            // override existing file
+            if (sip->type != T_FILE) {
+                error("mv: %s: not a file\n", spath);
+                return EXIT_FAILURE;
+            }
+            iunlink(img, root_inode, dpath);
+            inode_t ip = ilookup(img, root_inode, ddir);
+            assert(ip != NULL && ip->type == T_DIR);
+            daddent(img, ip, dname, sip);
+            iunlink(img, root_inode, spath);
+        }
+        else { // dip->type == T_DEV
+            error("mv: %s: device\n", dpath);
+            return EXIT_FAILURE;
+        }
+    }
+    else { // dip == NULL
         if (is_empty(dname)) {
             error("mv: %s: no such directory\n", dpath);
             return EXIT_FAILURE;
@@ -947,58 +1058,11 @@ int do_mv(img_t img, int argc, char *argv[]) {
             error("mv: %s: not a directory\n", ddir);
             return EXIT_FAILURE;
         }
-        dip = ip;
+        daddent(img, ip, dname, sip);
+        iunlink(img, root_inode, spath);
+        if (sip->type == T_DIR)
+            dmkparlink(img, ip, sip);
     }
-    else {
-        if (dip == sip)
-            return EXIT_SUCCESS;
-        if (dip->type == T_DEV) {
-            error("mv: %s: device\n", dpath);
-            return EXIT_FAILURE;
-        }
-        else if (dip->type == T_DIR) {
-            inode_t ip = dirlookup(img, dip, sname, NULL);
-            if (ip != NULL) {
-                if (ip->type == T_DEV) {
-                    error("mv: %s/%s: device\n", dpath, sname);
-                    return EXIT_FAILURE;
-                }
-                else if (ip->type == T_DIR) {
-                    if (sip->type != T_DIR) {
-                        error("mv: %s/%s: directory\n", dpath, sname);
-                        return EXIT_FAILURE;
-                    }
-                    if (!emptydir(img, ip)) {
-                        error("mv: %s/%s: not empty\n", dpath, sname);
-                        return EXIT_FAILURE;
-                    }
-                }
-                else if (ip->type == T_FILE && sip->type != T_FILE) {
-                    error("mv: %s: directory or device\n", spath);
-                    return EXIT_FAILURE;
-                }
-                iunlink(img, dip, sname);
-            }
-            dirname = dpath;
-            dname = sname;
-        }
-        else {
-            if (sip->type != T_FILE) {
-                error("mv: %s: directory or device\n", spath);
-                return EXIT_FAILURE;
-            }
-            iunlink(img, root_inode, dpath);
-            dip = ilookup(img, root_inode, ddir);
-            assert(dip != NULL && dip->type == T_DIR);
-        }
-    }
-
-    if (addent(img, dip, dname, sip) < 0) {
-        error("mv: %s: cannt create a link\n", dirname);
-        return EXIT_FAILURE;
-    }
-    iunlink(img, root_inode, spath);
-
     return EXIT_SUCCESS;
 }
 
@@ -1034,15 +1098,28 @@ int do_ln(img_t img, int argc, char *argv[]) {
         error("ln: %s: not a directory\n", ddir);
         return EXIT_FAILURE;
     }
-    if (is_empty(dname))
+    if (is_empty(dname)) {
         dname = splitpath(spath, NULL, 0);
-    if (dirlookup(img, dip, dname, NULL) != NULL) {
-        error("ln: %s/%s: file exists\n", ddir, dname);
+        if (dlookup(img, dip, dname, NULL) != NULL) {
+            error("ln: %s/%s: file exists\n", ddir, dname);
+            return EXIT_FAILURE;
+        }
+    }
+    else {
+        inode_t ip = dlookup(img, dip, dname, NULL);
+        if (ip != NULL) {
+            if (ip->type != T_DIR) {
+                error("ln: %s/%s: file exists\n", ddir, dname);
+                return EXIT_FAILURE;
+            }
+            dname = splitpath(spath, NULL, 0);
+            dip = ip;
+        }
+    }
+    if (daddent(img, dip, dname, sip) < 0) {
+        error("ln: %s/%s: cannot create a link\n", ddir, dname);
         return EXIT_FAILURE;
     }
-
-    addent(img, dip, dname, sip);
-
     return EXIT_SUCCESS;
 }
 
@@ -1054,20 +1131,14 @@ int do_mkdir(img_t img, int argc, char *argv[]) {
     }
     char *path = argv[0];
     
-    inode_t ip = ilookup(img, root_inode, path);
-    if (ip != NULL) {
+    if (ilookup(img, root_inode, path) != NULL) {
         error("mkdir: %s: file exists\n", path);
         return EXIT_FAILURE;
     }
-    inode_t dp;
-    ip = icreat(img, root_inode, path, T_DIR, &dp);
-    if (ip == NULL) {
+    if (icreat(img, root_inode, path, T_DIR, NULL) == NULL) {
         error("mkdir: %s: cannot create\n", path);
         return EXIT_FAILURE;
     }
-    addent(img, ip, ".", ip);
-    addent(img, ip, "..", dp);
-
     return EXIT_SUCCESS;
 }
 
