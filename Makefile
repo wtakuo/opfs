@@ -3,9 +3,9 @@
 
 
 HDRS = $(XV6HDRS)
-SRCS = opfs.c
+SRCS = opfs.c newfs.c
 OBJS = $(SRCS:%.c=%.o)
-EXES = opfs
+EXES = opfs newfs
 
 TAGFILES = GTAGS GRTAGS GPATH
 
@@ -31,7 +31,10 @@ GTAGS = gtags
 
 all: $(EXES)
 
-opfs: $(OBJS)
+opfs: opfs.o
+	$(CC) $(CFLAGS) $(LDFLAGS) $(OPTFLAGS) -o $@ $^
+
+newfs: newfs.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OPTFLAGS) -o $@ $^
 
 $(XV6HDRS): $(XV6HOME)
