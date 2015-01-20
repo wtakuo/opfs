@@ -2,9 +2,10 @@
 # Copyright (c) 2015 Takuo Watanabe
 
 
-HDRS = $(XV6HDRS)
-SRCS = opfs.c newfs.c
+HDRS = libfs.h $(XV6HDRS)
+SRCS = opfs.c newfs.c libfs.c
 OBJS = $(SRCS:%.c=%.o)
+LIBS = libfs.o
 EXES = opfs newfs
 
 TAGFILES = GTAGS GRTAGS GPATH
@@ -31,10 +32,10 @@ GTAGS = gtags
 
 all: $(EXES)
 
-opfs: opfs.o
+opfs: opfs.o $(LIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OPTFLAGS) -o $@ $^
 
-newfs: newfs.o
+newfs: newfs.o $(LIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OPTFLAGS) -o $@ $^
 
 $(XV6HDRS): $(XV6HOME)
