@@ -32,6 +32,7 @@ typedef uchar (*img_t)[BSIZE];
 // super block
 #define SBLK(img) ((struct superblock *)(img)[1])
 
+bool valid_data_block(img_t img, uint b);
 uint balloc(img_t img);
 int bfree(img_t img, uint b);
 

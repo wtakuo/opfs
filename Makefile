@@ -3,10 +3,10 @@
 
 
 HDRS = libfs.h $(XV6HDRS)
-SRCS = opfs.c newfs.c libfs.c
+SRCS = opfs.c newfs.c modfs.c libfs.c
 OBJS = $(SRCS:%.c=%.o)
 LIBS = libfs.o
-EXES = opfs newfs
+EXES = opfs newfs modfs
 
 TAGFILES = GTAGS GRTAGS GPATH
 
@@ -36,6 +36,9 @@ opfs: opfs.o $(LIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OPTFLAGS) -o $@ $^
 
 newfs: newfs.o $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) $(OPTFLAGS) -o $@ $^
+
+modfs: modfs.o $(LIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OPTFLAGS) -o $@ $^
 
 $(XV6HDRS): $(XV6HOME)

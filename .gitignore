@@ -1,4 +1,6 @@
 opfs
+newfs
+modfs
 types.h
 fs.h
 GTAGS

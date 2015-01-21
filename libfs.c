@@ -157,11 +157,11 @@ char *typename(int type) {
  */
 
 // checks if b is a valid data block number
-static inline bool valid_data_block(img_t img, uint b) {
-    uint Ni = SBLK(img)->ninodes / IPB + 1;       // # of inode blocks
-    uint Nm = SBLK(img)->size / (BSIZE * 8) + 1;  // # of bitmap blocks
-    uint Nd = SBLK(img)->nblocks;                 // # of data blocks
-    uint d = 2 + Ni + Nm;                         // 1st data block number
+bool valid_data_block(img_t img, uint b) {
+    const uint Ni = SBLK(img)->ninodes / IPB + 1;       // # of inode blocks
+    const uint Nm = SBLK(img)->size / (BSIZE * 8) + 1;  // # of bitmap blocks
+    const uint Nd = SBLK(img)->nblocks;                 // # of data blocks
+    const uint d = 2 + Ni + Nm;                         // 1st data block number
     return d <= b && b <= d + Nd - 1;
 }
 
