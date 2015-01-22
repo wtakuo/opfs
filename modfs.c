@@ -15,6 +15,7 @@
  *     inode.size inum [val]
  *     inode.addrs inum n [val]
  *     inode.indirect inum [val]
+ *     dirent path name [val]
  */
 
 #include <stdio.h>
@@ -170,6 +171,68 @@ int do_inode(img_t img, int argc, char *argv[], char *field) {
     return EXIT_FAILURE;
 }
 
+// dirent path name [val]
+int do_dirent(img_t img, int argc, char *argv[], char *field) {
+    if (argc < 2 || argc > 3) {
+        error("usage: %s img_file dirent path name [val]\n", progname);
+        return EXIT_FAILURE;
+    }
+    char *path = argv[0];
+    char *name = argv[1];
+
+    inode_t dp = ilookup(img, root_inode, path);
+    if (dp == NULL) {
+        error("dirent: %s: no such directory\n", path);
+        return EXIT_FAILURE;
+    }
+    if (dp->type != T_DIR) {
+        error("dirent: %s: not a directory\n", path);
+        return EXIT_FAILURE;
+    }
+
+    uint off;
+    inode_t ip = dlookup(img, dp, name, &off);
+
+    if (argc == 2) {
+        if (ip == NULL) {
+            error("dirent: %s: no such file or directory\n", name);
+            return EXIT_FAILURE;
+        }
+        printf("%d\n", geti(img, ip));
+        
+    }
+    else {
+        if (strcmp(argv[2], "delete") == 0) {
+            uchar zero[sizeof(struct dirent)];
+            memset(zero, 0, sizeof(zero));
+            if (iwrite(img, dp, zero, sizeof(zero), off) != sizeof(zero)) {
+                error("dirent: %s: write error\n", name);
+                return EXIT_FAILURE;
+            }
+        }
+        else {
+            uint inum = atoi(argv[2]);
+            if (ip == NULL) {
+                error("dirent: %s: no such file or directory\n", name);
+                return EXIT_FAILURE;
+            }
+            struct dirent de;
+            if (iread(img, dp, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
+                error("dirent: %s: read error\n", name);
+                return EXIT_FAILURE;
+            }
+            de.inum = inum;
+            if (iwrite(img, dp, (uchar *)&de, sizeof(de), off) != sizeof(de)) {
+                error("dirent: %s: write error\n", name);
+                return EXIT_FAILURE;
+            }
+        }
+    }
+
+    return EXIT_SUCCESS;
+}
+
+
 struct cmd_table_ent {
     char *name;
     char *args;
@@ -188,6 +251,7 @@ struct cmd_table_ent cmd_table[] = {
     { "inode.size", "inum [val]", do_inode, "size" },
     { "inode.addrs", "inum n [val]", do_inode, "addrs" },
     { "inode.indirect", "inum [val]", do_inode, "indirect" },
+    { "dirent", "path name [val]", do_dirent, NULL },
     { NULL, NULL }
 };
 
