@@ -26,7 +26,7 @@ GTAGS = gtags
 %.o: %.c $(HDRS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(OPTFLAGS) -c $<
 
-.PHONY: all clean allclean
+.PHONY: all tags clean allclean
 
 .PRECIOUS: %.o
 
