@@ -1,6 +1,6 @@
 /*
- * newfs: a simple utility for creating empty xv6 file system images
- * Copyright (c) 2015 Takuo Watanabe
+ * opfs: a simple utility for creating empty xv6 file system images
+ * Copyright (c) 2015, 2016 Takuo Watanabe
  */
 
 /* usage: newfs img_file size ninodes nlog 
@@ -23,16 +23,18 @@
 
 #include "libfs.h"
 
-
 int setupfs(img_t img, uint size, uint ninodes, uint nlog) {
     uint niblocks = ninodes / IPB + 1;
     uint nmblocks = size / (BSIZE * 8) + 1;
-    uint nblocks = size - (2 + niblocks + nmblocks + nlog);
+    uint nblocks = size - (2 + nlog + niblocks + nmblocks);
+    uint logstart = 2;
+    uint inodestart = logstart + nlog;
+    uint bmapstart = inodestart + niblocks;
+    uint dstart = bmapstart + nmblocks;
 
     printf("# of blocks: %u\n", size);
     printf("# of inodes: %u\n", ninodes);
     printf("# of log blocks: %u\n", nlog);
-    
     printf("# of inode blocks: %u\n", niblocks);
     printf("# of bitmap blocks: %u\n", nmblocks);
     printf("# of data blocks: %u\n", nblocks);
@@ -41,14 +43,15 @@ int setupfs(img_t img, uint size, uint ninodes, uint nlog) {
     memset((uchar *)img, 0, BSIZE * size);
 
     // setup superblock
-    struct superblock sblk = { size, nblocks, ninodes, nlog };
+    struct superblock sblk = {
+        size, nblocks, ninodes, nlog, logstart, inodestart, bmapstart
+    };
     memmove(img[1], (uchar *)&sblk, sizeof(sblk));
 
     // setup initial bitmap
-    const uint na = 2 + niblocks + nmblocks;
-    for (uint b = 0; b < na; b += BPB) {
-        uchar *bp = img[BBLOCK(b, ninodes)];
-        for (int bi = 0; bi < BPB && b + bi < na; bi++) {
+    for (uint b = 0; b < dstart; b += BPB) {
+        uchar *bp = img[BBLOCK(b, SBLKS(img))];
+        for (int bi = 0; bi < BPB && b + bi < dstart; bi++) {
             int m = 1 << (bi % 8);
             bp[bi / 8] |= m;
         }
@@ -98,7 +101,7 @@ int main(int argc, char *argv[]) {
 
     munmap(img, img_size);
     close(fd);
-    
+
     return status;
 }
 

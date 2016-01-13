@@ -1,6 +1,6 @@
 /*
- * ckfs: a simple utility for checking xv6 file system images
- * Copyright (c) 2015 Takuo Watanabe
+ * opfs: a simple utility for manipulating xv6 file system images
+ * Copyright (c) 2015, 2016 Takuo Watanabe
  */
 
 /* usage: ckfs img_file command [arg...]
@@ -9,6 +9,9 @@
  *     superblock.nblocks [val]
  *     superblock.ninodes [val]
  *     superblock.nlog [val]
+ *     superblock.logstart [val]
+ *     superblock.inodestart [val]
+ *     superblock.bmapstart [val]
  *     bitmap bnum [val]
  *     inode.type inum [val]
  *     inode.nlink inum [val]
@@ -43,6 +46,12 @@ int do_superblock(img_t img, int argc, char *argv[], char *field) {
         f = &SBLK(img)->ninodes;
     else if (strcmp(field, "nlog") == 0)
         f = &SBLK(img)->nlog;
+    else if (strcmp(field, "logstart") == 0)
+        f = &SBLK(img)->logstart;
+    else if (strcmp(field, "inodestart") == 0)
+        f = &SBLK(img)->inodestart;
+    else if (strcmp(field, "bmapstart") == 0)
+        f = &SBLK(img)->bmapstart;
     else {
         error("no such field in superblock: %s\n", field);
         return EXIT_FAILURE;
@@ -69,7 +78,7 @@ int do_bitmap(img_t img, int argc, char *argv[], char *field) {
         error("bitmap: %u: invalid block number\n", bnum);
         return EXIT_FAILURE;
     }
-    uchar *bp = img[BBLOCK(bnum, SBLK(img)->ninodes)];
+    uchar *bp = img[BBLOCK(bnum, SBLKS(img))];
     int bi = bnum % BPB;
     int m = 1 << (bi % 8);
 
@@ -245,6 +254,9 @@ struct cmd_table_ent cmd_table[] = {
     { "superblock.nblocks", "[val]", do_superblock, "nblocks" },
     { "superblock.ninodes", "[val]", do_superblock, "ninodes" },
     { "superblock.nlog", "[val]", do_superblock, "nlog" },
+    { "superblock.logstart", "[val]", do_superblock, "logstart" },
+    { "superblock.inodestart", "[val]", do_superblock, "inodestart" },
+    { "superblock.bmapstart", "[val]", do_superblock, "bmapstart" },
     { "bitmap", "bnum [val]", do_bitmap, NULL },
     { "inode.type", "inum [val]", do_inode, "type" },
     { "inode.nlink", "inum [val]", do_inode, "nlink" },

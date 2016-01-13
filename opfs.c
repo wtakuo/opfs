@@ -1,6 +1,6 @@
 /*
  * opfs: a simple utility for manipulating xv6 file system images
- * Copyright (c) 2015 Takuo Watanabe
+ * Copyright (c) 2015, 2016 Takuo Watanabe
  */
 
 /* usage: opfs img_file command [arg...]
@@ -43,30 +43,33 @@ int do_diskinfo(img_t img, int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    struct superblock *sb = SBLK(img);
+
     uint N = SBLK(img)->size;
-    uint Ni = SBLK(img)->ninodes / IPB + 1;
+    uint Ni = sb->ninodes / IPB + 1;
     uint Nm = N / (BSIZE * 8) + 1;
+    uint dstart = 2 + sb->nlog + Ni + Nm;
     uint Nd = SBLK(img)->nblocks;
-    uint Nl = SBLK(img)->nlog;
 
     printf("total blocks: %d (%d bytes)\n", N, N * BSIZE);
-    printf("inode blocks: #%d-#%d (%d blocks, %d inodes)\n",
-           2, Ni + 1, Ni, SBLK(img)->ninodes);
-    printf("bitmap blocks: #%d-#%d (%d blocks)\n", Ni + 2, Ni + Nm + 1, Nm);
-    printf("data blocks: #%d-#%d (%d blocks)\n",
-           Ni + Nm + 2, Ni + Nm + Nd + 1, Nd);
     printf("log blocks: #%d-#%d (%d blocks)\n",
-           Ni + Nm + Nd + 2, Ni + Nm + Nd + Nl + 1, Nl);
+           sb->logstart, sb->logstart + sb->nlog - 1, sb->nlog);
+    printf("inode blocks: #%d-#%d (%d blocks, %d inodes)\n",
+           sb->inodestart, sb->inodestart + Ni - 1, Ni, sb->ninodes);
+    printf("bitmap blocks: #%d-#%d (%d blocks)\n",
+           sb->bmapstart, sb->bmapstart + Nm - 1, Nm);
+    printf("data blocks: #%d-#%d (%d blocks)\n",
+           dstart, dstart + Nd - 1, Nd);
     printf("maximum file size (bytes): %zu\n", MAXFILESIZE);
 
     int nblocks = 0;
-    for (uint b = Ni + 2; b <= Ni + Nm + 1; b++)
+    for (uint b = sb->bmapstart; b <= sb->bmapstart + Nm - 1; b++)
         for (int i = 0; i < BSIZE; i++)
             nblocks += bitcount(img[b][i]);
     printf("# of used blocks: %d\n", nblocks);
 
     int n_dirs = 0, n_files = 0, n_devs = 0;
-    for (uint b = 2; b <= Ni + 1; b++)
+    for (uint b = sb->inodestart; b <= sb->inodestart + Ni - 1; b++)
         for (int i = 0; i < IPB; i++)
             switch (((inode_t)img[b])[i].type) {
             case T_DIR:

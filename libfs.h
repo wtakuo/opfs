@@ -1,3 +1,8 @@
+/*
+ * opfs: a simple utility for manipulating xv6 file system images
+ * Copyright (c) 2015, 2016 Takuo Watanabe
+ */
+
 // xv6 header files
 #include "types.h"
 #include "fs.h"
@@ -31,6 +36,7 @@ typedef uchar (*img_t)[BSIZE];
 
 // super block
 #define SBLK(img) ((struct superblock *)(img)[1])
+#define SBLKS(img) (*(SBLK(img)))
 
 bool valid_data_block(img_t img, uint b);
 uint balloc(img_t img);

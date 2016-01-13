@@ -1,17 +1,20 @@
 opfs
-======
+========
 A simple utility for manipulating xv6 file system images
 
-Installation
-------
+## Installation
+
 Two header files (types.h and fs.h) in xv6 distribution are required to build this software.
 Specify the xv6 distribution directory as follows.
 
     cd /path-to-opfs
     make XV6HOME=/path-to-xv6-
 
-Usage
-------
+## Usage
+
+Opfs provides three commands: `opfs`, `newfs` and `modfs'.
+
+`opfs` safely operates on a disk image.
 
     opfs img_file command [args]
 
@@ -27,5 +30,15 @@ Commands are one of the following:
 * `mv` moves (rename) files
 * `ln` makes link
 * `mkdir` makes a directory
-* `rmdir` removes an empty directory
+* `rmdir` removes an empty directory 
+
+
+`newfs` creates a new empty disk image file of name `img_file`.
+ 
+    newfs img_file size ninodes nlog
+
+`modfs` unsafely modifies a disk image.
+
+    modfs img_file command [arg...]
+
 

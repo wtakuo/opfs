@@ -1,3 +1,8 @@
+/*
+ * opfs: a simple utility for manipulating xv6 file system images
+ * Copyright (c) 2015, 2016 Takuo Watanabe
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -13,46 +18,44 @@
 #include "libfs.h"
 
 /* img file structure
+ * 
+ *  0    1    2           i           m           d        N-1
+ * +----+----+----...----+----...----+----...----+----...----+
+ * | BB | SB |    LB     |    IB     |    MB     |    DB     |
+ * +----+----+----...----+----...----+----...----+----...----+
+ *           |<-- Nl --->|<-- Ni --->|<-- Nm --->|<-- Nd --->|
  *
- *    0    1    2         m-1   m         d-1   d        l-1    l         N-1
- * +----+----+----+-...-+----+----+-...-+----+----+-...-+----+----+-...-+----+
- * | BB | SB | IB | ... | IB | MB | ... | MB | DB | ... | DB | LB | ... | LB |
- * +----+----+----+-...-+----+----+-...-+----+----+-...-+----+----+-...-+----+
- *
- *           |<---- Ni ----->|<---- Nm ----->|<---- Nd ----->|<---- Nl ----->|
- *
- * BB: boot block   [0, 0]
- * SB: super block  [1, 1]
- * IB: inode block  [2, 2 - 1 + Ni]
- * MB: bitmap block [m, m - 1 + Nm]   (m = Nb + Ns + Ni)
- * DB: data block   [d, d - 1 + Nd]   (d = Nb + Ns + Ni + Nm)
- * LB: log block    [l, l - 1 + Nl]   (l = Nb + Ns + Ni + Nm + Nd = N - Nl)
- *
- * N = sb.size = Nb + Ns + Ni + Nm + Nd + Nl          (# of all blocks)
- * Nb = 1                                             (# of boot block)
- * Ns = 1                                             (# of super block)
- * Ni = sb.ninodes / IPB + 1                          (# of inode blocks)
- * Nm = N / (BSIZE * 8) + 1                           (# of bitmap blocks)
- * Nd = sb.nblocks = N - (Nb + Ns + Ni + Nm + Nl)     (# of data blocks)
- * Nl = sb.nlog                                       (# of log blocks)
+ * BB: boot block    [0, 0]
+ * SB: super block   [1, 1]
+ * LB: log block     [l, l + Nl - 1] (l = sb.logstart)
+ * IB: inode block   [i, i + Ni - 1] (i = sb.inodestart)
+ * MB: bitmap blocks [m, m + Nm - 1] (m = sb.bmapstart)
+ * DB: data blocks   [d, d + Nd - 1] (d = Nb + Ns + Nl + Nm + Nb)
+
+ * N  = sb.size = Nb + Ns + Nl + Ni + Nm + Nd
+ * Nb = 1
+ * Ns = 1
+ * Nl = sb.nlog
+ * Ni = sb.ninodes / IPB + 1
+ * Nm = N / (BSIZE * 8) + 1
+ * Nd = sb.nblocks
  *
  * BSIZE = 512
  * IPB = BSIZE / sizeof(struct dinode) = 512 / 64 = 8
  *
  * Example: fs.img
- * BB: boot block   [0, 0]      = [0x00000000, 0x000001ff]
- * SB: super block  [1, 1]      = [0x00000200, 0x000003ff]
- * IB: inode block  [2, 27]     = [0x00000400, 0x000037ff]
- * MB: bitmap block [28, 28]    = [0x00003800, 0x000039ff]
- * DB: data block   [29, 993]   = [0x00003a00, 0x0007c3ff]
- * LB: log block    [994, 1023] = [0x0007c400, 0x0007ffff]
+ * BB: boot block   [0,  0]     = [0x00000000, 0x000001ff]
+ * SB: super block  [1,  1]     = [0x00000200, 0x000003ff]
+ * LB: log block    [2,  31]    = [0x00000400, 0x00003fff]
+ * IB: inode block  [32, 57]    = [0x00004000, 0x000073ff]
+ * BB: bitmap block [58, 58]    = [0x00007400, 0x000075ff]
+ * DB: data block   [59, 999]   = [0x00007600, 0x0007Cfff]
  *
- * N  = 1024
+ * N = 1000
+ * Nl = 30
  * Ni = 200 / 8 + 1 = 26
- * Nm = 1024 / (512 * 8) + 1 = 1
- * Nd = sb.nblocks = 1024 - (1 + 1 + 26 + 1 + 30) = 965
- * Nl = sb.nlog = 30
- *
+ * Nm = 1000 / (512 * 8) + 1 = 1
+ * Nd = 1000 - (1 + 1 + 30 + 26 + 1) = 941
  */
 
 /* dinode structure
@@ -158,17 +161,18 @@ char *typename(int type) {
 
 // checks if b is a valid data block number
 bool valid_data_block(img_t img, uint b) {
+    const uint Nl = SBLK(img)->nlog;                    // # of log blocks
     const uint Ni = SBLK(img)->ninodes / IPB + 1;       // # of inode blocks
     const uint Nm = SBLK(img)->size / (BSIZE * 8) + 1;  // # of bitmap blocks
     const uint Nd = SBLK(img)->nblocks;                 // # of data blocks
-    const uint d = 2 + Ni + Nm;                         // 1st data block number
+    const uint d = 2 + Nl + Ni + Nm;                    // 1st data block number
     return d <= b && b <= d + Nd - 1;
 }
 
 // allocates a new data block and returns its block number
 uint balloc(img_t img) {
     for (int b = 0; b < SBLK(img)->size; b += BPB) {
-        uchar *bp = img[BBLOCK(b, SBLK(img)->ninodes)];
+        uchar *bp = img[BBLOCK(b, SBLKS(img))];
         for (int bi = 0; bi < BPB && b + bi < SBLK(img)->size; bi++) {
             int m = 1 << (bi % 8);
             if ((bp[bi / 8] & m) == 0) {
@@ -192,7 +196,7 @@ int bfree(img_t img, uint b) {
         derror("bfree: %u: invalid data block number\n", b);
         return -1;
     }
-    uchar *bp = img[BBLOCK(b, SBLK(img)->ninodes)];
+    uchar *bp = img[BBLOCK(b, SBLKS(img))];
     int bi = b % BPB;
     int m = 1 << (bi % 8);
     if ((bp[bi / 8] & m) == 0)
@@ -213,7 +217,7 @@ inode_t root_inode;
 // returns the pointer to the inum-th dinode structure
 inode_t iget(img_t img, uint inum) {
     if (0 < inum && inum < SBLK(img)->ninodes)
-        return (inode_t)img[IBLOCK(inum)] + inum % IPB;
+        return (inode_t)img[IBLOCK(inum, SBLKS(img))] + inum % IPB;
     derror("iget: %u: invalid inode number\n", inum);
     return NULL;
 }
@@ -222,7 +226,7 @@ inode_t iget(img_t img, uint inum) {
 uint geti(img_t img, inode_t ip) {
     uint Ni = SBLK(img)->ninodes / IPB + 1;       // # of inode blocks
     for (int i = 0; i < Ni; i++) {
-        inode_t bp = (inode_t)img[i + 2];
+        inode_t bp = (inode_t)img[SBLK(img)->inodestart + i];
         if (bp <= ip && ip < bp + IPB)
             return ip - bp + i * IPB;
     }
@@ -233,7 +237,7 @@ uint geti(img_t img, inode_t ip) {
 // allocate a new inode structure
 inode_t ialloc(img_t img, uint type) {
     for (int inum = 1; inum < SBLK(img)->ninodes; inum++) {
-        inode_t ip = (inode_t)img[IBLOCK(inum)] + inum % IPB;
+        inode_t ip = (inode_t)img[IBLOCK(inum, SBLKS(img))] + inum % IPB;
         if (ip->type == 0) {
             memset(ip, 0, sizeof(struct dinode));
             ip->type = type;
