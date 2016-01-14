@@ -13,7 +13,7 @@ XV6HOME = $(HOME)/xv6
 XV6HDRS = types.h fs.h
 
 CC = gcc
-CFLAGS = -std=c11 -pedantic -Wall -Werror -g
+CFLAGS = -std=c99 -pedantic -Wall -Werror -g
 CPPFLAGS = # -DNDEBUG
 LDFLAGS =
 OPTFLAGS =
