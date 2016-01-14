@@ -6,6 +6,7 @@ fs.h
 GTAGS
 GRTAGS
 GPATH
+*.img
 *.o
 *~
 a.out
