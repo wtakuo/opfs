@@ -91,9 +91,9 @@ static inline int max(int x, int y) {
     return x > y ? x : y;
 }
 
-// ceiling(x / y) where x >=0, y >= 0
+// ceiling(x / y) where x >=0, y > 0
 static inline int divceil(int x, int y) {
-    return x == 0 ? 0 : (x - 1) / y + 1;
+    return (x + y - 1) / y;
 }
 
 // the number of 1s in a 32-bit unsigned integer
