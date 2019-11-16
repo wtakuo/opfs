@@ -171,9 +171,9 @@ bool valid_data_block(img_t img, uint b) {
 
 // allocates a new data block and returns its block number
 uint balloc(img_t img) {
-    for (int b = 0; b < SBLK(img)->size; b += BPB) {
+    for (uint b = 0; b < SBLK(img)->size; b += BPB) {
         uchar *bp = img[BBLOCK(b, SBLKS(img))];
-        for (int bi = 0; bi < BPB && b + bi < SBLK(img)->size; bi++) {
+        for (uint bi = 0; bi < BPB && b + bi < SBLK(img)->size; bi++) {
             int m = 1 << (bi % 8);
             if ((bp[bi / 8] & m) == 0) {
                 bp[bi / 8] |= m;
@@ -225,7 +225,7 @@ inode_t iget(img_t img, uint inum) {
 // retrieves the inode number of a dinode structure
 uint geti(img_t img, inode_t ip) {
     uint Ni = SBLK(img)->ninodes / IPB + 1;       // # of inode blocks
-    for (int i = 0; i < Ni; i++) {
+    for (uint i = 0; i < Ni; i++) {
         inode_t bp = (inode_t)img[SBLK(img)->inodestart + i];
         if (bp <= ip && ip < bp + IPB)
             return ip - bp + i * IPB;
@@ -236,7 +236,7 @@ uint geti(img_t img, inode_t ip) {
 
 // allocate a new inode structure
 inode_t ialloc(img_t img, uint type) {
-    for (int inum = 1; inum < SBLK(img)->ninodes; inum++) {
+    for (uint inum = 1; inum < SBLK(img)->ninodes; inum++) {
         inode_t ip = (inode_t)img[IBLOCK(inum, SBLKS(img))] + inum % IPB;
         if (ip->type == 0) {
             memset(ip, 0, sizeof(struct dinode));
@@ -358,7 +358,7 @@ int itruncate(img_t img, inode_t ip, uint size) {
             uint *iblock = (uint *)img[iaddr];
             int ni = max(n - NDIRECT, 0);  // # of used indirect blocks
             int ki = max(k - NDIRECT, 0);  // # of indirect blocks to keep
-            for (uint i = ki; i < ni; i++) {
+            for (int i = ki; i < ni; i++) {
                 bfree(img, iblock[i]);
                 iblock[i] = 0;
             }
@@ -369,7 +369,7 @@ int itruncate(img_t img, inode_t ip, uint size) {
         }
     }
     else {
-        int n = size - ip->size; // # of bytes to be filled
+        uint n = size - ip->size; // # of bytes to be filled
         for (uint off = ip->size, t = 0, m = 0; t < n; t += m, off += m) {
             uchar *bp = img[bmap(img, ip, off / BSIZE)];
             m = min(n - t, BSIZE - off % BSIZE);

@@ -7,6 +7,11 @@
 #include "types.h"
 #include "fs.h"
 
+// utitlity macros
+// array length
+#define ALEN(a) (sizeof (a) / sizeof (a)[0])
+#define UNUSED(x) (void)(x)
+
 // file types (copied from xv6/stat.h)
 // Including xv6/stat.h causes a name clash (with struct stat)
 #define T_DIR  1   // Directory

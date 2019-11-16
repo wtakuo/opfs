@@ -69,6 +69,7 @@ int do_superblock(img_t img, int argc, char *argv[], char *field) {
 
 // bitmap bnum [val]
 int do_bitmap(img_t img, int argc, char *argv[], char *field) {
+    UNUSED(field);
     if (argc < 1 || argc > 2) {
         error("usage: %s img_file bitmap [val]\n", progname);
         return EXIT_FAILURE;
@@ -182,6 +183,7 @@ int do_inode(img_t img, int argc, char *argv[], char *field) {
 
 // dirent path name [val]
 int do_dirent(img_t img, int argc, char *argv[], char *field) {
+    UNUSED(field);
     if (argc < 2 || argc > 3) {
         error("usage: %s img_file dirent path name [val]\n", progname);
         return EXIT_FAILURE;
@@ -264,11 +266,10 @@ struct cmd_table_ent cmd_table[] = {
     { "inode.addrs", "inum n [val]", do_inode, "addrs" },
     { "inode.indirect", "inum [val]", do_inode, "indirect" },
     { "dirent", "path name [val]", do_dirent, NULL },
-    { NULL, NULL }
 };
 
 int exec_cmd(img_t img, char *cmd, int argc, char *argv[]) {
-    for (int i = 0; cmd_table[i].name != NULL; i++) {
+    for (uint i = 0; i < ALEN(cmd_table); i++) {
         if (strcmp(cmd, cmd_table[i].name) == 0)
             return cmd_table[i].fun(img, argc, argv, cmd_table[i].field);
     }

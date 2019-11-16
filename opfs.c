@@ -38,6 +38,7 @@
 
 // diskinfo
 int do_diskinfo(img_t img, int argc, char *argv[]) {
+    UNUSED(argv);
     if (argc != 0) {
         error("usage: %s img_file diskinfo\n", progname);
         return EXIT_FAILURE;
@@ -70,7 +71,7 @@ int do_diskinfo(img_t img, int argc, char *argv[]) {
 
     int n_dirs = 0, n_files = 0, n_devs = 0;
     for (uint b = sb->inodestart; b <= sb->inodestart + Ni - 1; b++)
-        for (int i = 0; i < IPB; i++)
+        for (uint i = 0; i < IPB; i++)
             switch (((inode_t)img[b])[i].type) {
             case T_DIR:
                 n_dirs++;
@@ -115,7 +116,7 @@ int do_info(img_t img, int argc, char *argv[]) {
             bcount++;
             printf(" %d", iaddr);
             uint *iblock = (uint *)img[iaddr];
-            for (int i = 0; i < BSIZE / sizeof(uint) && iblock[i] != 0;
+            for (uint i = 0; i < BSIZE / sizeof(uint) && iblock[i] != 0;
                  i++, bcount++)
                 printf(" %d", iblock[i]);
         }
@@ -563,11 +564,10 @@ struct cmd_table_ent cmd_table[] = {
     { "ln", "spath dpath", do_ln },
     { "mkdir", "path", do_mkdir },
     { "rmdir", "path", do_rmdir },
-    { NULL, NULL }
 };
 
 int exec_cmd(img_t img, char *cmd, int argc, char *argv[]) {
-    for (int i = 0; cmd_table[i].name != NULL; i++) {
+    for (uint i = 0; i < ALEN(cmd_table); i++) {
         if (strcmp(cmd, cmd_table[i].name) == 0)
             return cmd_table[i].fun(img, argc, argv);
     }
