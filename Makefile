@@ -1,5 +1,5 @@
 # opfs: a simple utility for manipulating xv6 file system images
-# Copyright (c) 2015, 2016 Takuo Watanabe
+# Copyright (c) 2015-2019 Takuo Watanabe
 
 HDRS = libfs.h $(XV6HDRS)
 SRCS = opfs.c newfs.c modfs.c libfs.c

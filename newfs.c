@@ -1,6 +1,6 @@
 /*
  * opfs: a simple utility for creating empty xv6 file system images
- * Copyright (c) 2015, 2016 Takuo Watanabe
+ * Copyright (c) 2015-2019 Takuo Watanabe
  */
 
 /* usage: newfs img_file size ninodes nlog 

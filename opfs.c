@@ -1,6 +1,6 @@
 /*
  * opfs: a simple utility for manipulating xv6 file system images
- * Copyright (c) 2015, 2016 Takuo Watanabe
+ * Copyright (c) 2015-2019 Takuo Watanabe
  */
 
 /* usage: opfs img_file command [arg...]
