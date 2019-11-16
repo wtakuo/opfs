@@ -52,6 +52,7 @@ int do_diskinfo(img_t img, int argc, char *argv[]) {
     uint dstart = 2 + sb->nlog + Ni + Nm;
     uint Nd = SBLK(img)->nblocks;
 
+    printf("magic: %x\n", sb->magic);
     printf("total blocks: %d (%d bytes)\n", N, N * BSIZE);
     printf("log blocks: #%d-#%d (%d blocks)\n",
            sb->logstart, sb->logstart + sb->nlog - 1, sb->nlog);
@@ -609,13 +610,21 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    int status = EXIT_FAILURE;
+
+    uint magic = SBLK(img)->magic;
+    if (magic != FSMAGIC) {
+        error("%s: invalid magic number: 0x%x\n", img_file, magic);
+        goto bye;
+    }
+
     root_inode = iget(img, root_inode_number);
 
     // shift argc and argv to point the first command argument
-    int status = EXIT_FAILURE;
     if (setjmp(fatal_exception_buf) == 0)
         status = exec_cmd(img, cmd, argc - 3, argv + 3);
 
+bye:
     munmap(img, img_size);
     close(img_fd);
 

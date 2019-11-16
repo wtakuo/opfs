@@ -9,7 +9,7 @@ EXES = opfs newfs modfs
 
 TAGFILES = GTAGS GRTAGS GPATH
 
-XV6HOME = $(HOME)/xv6
+XV6HOME = $(HOME)/xv6-riscv
 XV6HDRS = types.h fs.h
 
 CC = clang
@@ -41,8 +41,8 @@ modfs: modfs.o $(LIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OPTFLAGS) -o $@ $^
 
 $(XV6HDRS): $(XV6HOME)
-	$(CP) $(XV6HOME)/types.h .
-	$(CP) $(XV6HOME)/fs.h .
+	$(CP) $(XV6HOME)/kernel/types.h .
+	$(CP) $(XV6HOME)/kernel/fs.h .
 
 tags: $(HDRS) $(SRCS)
 	$(GTAGS) -v

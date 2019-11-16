@@ -40,22 +40,22 @@
  * Nm = N / (BSIZE * 8) + 1
  * Nd = sb.nblocks
  *
- * BSIZE = 512
- * IPB = BSIZE / sizeof(struct dinode) = 512 / 64 = 8
+ * BSIZE = 1024
+ * IPB = BSIZE / sizeof(struct dinode) = 1024 / 64 = 16
  *
- * Example: fs.img
- * BB: boot block   [0,  0]     = [0x00000000, 0x000001ff]
- * SB: super block  [1,  1]     = [0x00000200, 0x000003ff]
- * LB: log block    [2,  31]    = [0x00000400, 0x00003fff]
- * IB: inode block  [32, 57]    = [0x00004000, 0x000073ff]
- * BB: bitmap block [58, 58]    = [0x00007400, 0x000075ff]
- * DB: data block   [59, 999]   = [0x00007600, 0x0007Cfff]
+ * Example: fs.img (xv6-riscv)
+ * BB: boot block   [0,  0]     = [0x00000000, 0x000003ff]
+ * SB: super block  [1,  1]     = [0x00000400, 0x000007ff]
+ * LB: log block    [2,  31]    = [0x00000800, 0x00007fff]
+ * IB: inode block  [32, 44]    = [0x00008000, 0x0000b3ff]
+ * BB: bitmap block [45, 45]    = [0x0000b400, 0x0000b7ff]
+ * DB: data block   [46, 999]   = [0x0000b800, 0x000f9fff]
  *
  * N = 1000
  * Nl = 30
- * Ni = 200 / 8 + 1 = 26
+ * Ni = 200 / 16 + 1 = 13
  * Nm = 1000 / (512 * 8) + 1 = 1
- * Nd = 1000 - (1 + 1 + 30 + 26 + 1) = 941
+ * Nd = 1000 - (1 + 1 + 30 + 13 + 1) = 954
  */
 
 /* dinode structure

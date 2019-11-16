@@ -44,6 +44,7 @@ int setupfs(img_t img, uint size, uint ninodes, uint nlog) {
 
     // setup superblock
     struct superblock sblk = {
+        FSMAGIC,
         size, nblocks, ninodes, nlog, logstart, inodestart, bmapstart
     };
     memmove(img[1], (uchar *)&sblk, sizeof(sblk));

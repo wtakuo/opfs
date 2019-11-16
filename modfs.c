@@ -5,6 +5,7 @@
 
 /* usage: ckfs img_file command [arg...]
  * command
+ *     superblock.magic [val]
  *     superblock.size [val]
  *     superblock.nblocks [val]
  *     superblock.ninodes [val]
@@ -38,7 +39,9 @@
 // superblock.FIELD [val]
 int do_superblock(img_t img, int argc, char *argv[], char *field) {
     uint *f = NULL;
-    if (strcmp(field, "size") == 0)
+    if (strcmp(field, "magic") == 0)
+        f = &SBLK(img)->magic;
+    else if (strcmp(field, "size") == 0)
         f = &SBLK(img)->size;
     else if (strcmp(field, "nblocks") == 0)
         f = &SBLK(img)->nblocks;
@@ -60,10 +63,18 @@ int do_superblock(img_t img, int argc, char *argv[], char *field) {
         error("usage: %s img_file superblock.%s [val]\n", progname, field);
         return EXIT_FAILURE;
     }
-    if (argc == 0)
-        printf("%u\n", *f);
-    else
-        *f = atoi(argv[0]);
+    if (argc == 0) {
+        if (strcmp(field, "magic") == 0)
+            printf("0x%x\n", *f);
+        else
+            printf("%u\n", *f);
+    }
+    else {
+        if (strcmp(field, "magic") == 0)
+            *f = strtol(argv[0], NULL, 16);
+        else
+            *f = atoi(argv[0]);
+    }
     return EXIT_SUCCESS;
 }
 
@@ -252,6 +263,7 @@ struct cmd_table_ent {
 };
 
 struct cmd_table_ent cmd_table[] = {
+    { "superblock.magic", "[val]", do_superblock, "magic" },
     { "superblock.size", "[val]", do_superblock, "size" },
     { "superblock.nblocks", "[val]", do_superblock, "nblocks" },
     { "superblock.ninodes", "[val]", do_superblock, "ninodes" },
