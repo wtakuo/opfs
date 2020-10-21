@@ -4,20 +4,20 @@ A simple utility for manipulating xv6-riscv file system images
 
 ## Installation
 
-Two header files (types.h and fs.h) in xv6 distribution are required to build this software.
-Specify the xv6-riscv distribution directory as follows.
-
+```
     cd /path-to-opfs
-    make XV6HOME=/path-to-xv6-riscv
+    make
+    make install
+```
 
 ## Usage
 
 Opfs provides three commands: `opfs`, `newfs` and `modfs'.
 
 `opfs` safely operates on a disk image.
-
+```
     opfs img_file command [args]
-
+```
 Commands are one of the following:
 
 * `diskinfo` displays the information of the disk image
@@ -34,11 +34,12 @@ Commands are one of the following:
 
 
 `newfs` creates a new empty disk image file of name `img_file`.
- 
+```
     newfs img_file size ninodes nlog
+```
 
 `modfs` unsafely modifies a disk image.
-
+```
     modfs img_file command [arg...]
-
+```
 
