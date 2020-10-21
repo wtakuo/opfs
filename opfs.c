@@ -581,7 +581,7 @@ int main(int argc, char *argv[]) {
     if (argc < 3) {
         error("usage: %s img_file command [arg...]\n", progname);
         error("Commands are:\n");
-        for (int i = 0; cmd_table[i].name != NULL; i++)
+        for (uint i = 0; i < ALEN(cmd_table); i++)
             error("    %s %s\n", cmd_table[i].name, cmd_table[i].args);
         return EXIT_FAILURE;
     }
