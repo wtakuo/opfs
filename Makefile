@@ -22,7 +22,7 @@ ifeq ($(shell uname),Darwin)
 	CC = clang
 endif
 ifeq ($(shell uname),Linux)
-	WFLAGS = -Wno-unused-result -Wno-stringop-truncation 
+	WFLAGS = -Wno-stringop-truncation 
 endif
 
 INSTALL = install

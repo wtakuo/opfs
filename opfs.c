@@ -183,7 +183,10 @@ int do_get(img_t img, int argc, char *argv[]) {
             error("get: %s: read error\n", path);
             return EXIT_FAILURE;
         }
-        write(1, buf, n);
+        if (write(1, buf, n) < 0) {
+            error("get: write error\n");
+            return EXIT_FAILURE;
+        }
     }
 
     return EXIT_SUCCESS;

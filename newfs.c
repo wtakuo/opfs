@@ -87,7 +87,10 @@ int main(int argc, char *argv[]) {
     size_t img_size = BSIZE * size;
     lseek(fd, img_size - 1, SEEK_SET);
     char c = 0;
-    write(fd, &c, 1);
+    if (write(fd, &c, 1) < 0) {
+        perror(file);
+        return EXIT_FAILURE;
+    }
 
     img_t img = mmap(NULL, img_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (img == MAP_FAILED) {
