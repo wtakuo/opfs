@@ -4,13 +4,21 @@ A set of simple utilities for manipulating [xv6-riscv](https://github.com/mit-pd
 
 ## Installation
 
-    make
-    make install
+Simply invoking `make` should build all the things: `opfs`, `newfs`, and `modfs`.
+```
+    $ make
+```
+You can copy these executables to your favorite place.
+Alternatively, you can invoke the target `install` of `Makefile` with the specification of `PREFIX` as follows.
+
+```
+    $ sudo make PREFIX=/usr/local install
+```
 
 ## Usage
-Opfs provides three commands: `opfs`, `newfs` and `modfs`.
+This package provides three commands: `opfs`, `newfs` and `modfs`.
 
-### 1. `opfs`
+### 1. opfs
 The command `opfs` provides safe operations on an xv6 file system in the disk image file (_imgfile_).
 
 <pre>
@@ -32,7 +40,7 @@ _Command_ is one of the following:
 * `rmdir` _path_ : removes an empty directory specified by _path_
 
 #### Examples
-Displays the information of the file system in `fs.img`.
+Display the information of the file system in `fs.img`.
 ```
 $ opfs fs.img diskinfo
 magic: 10203040
@@ -73,10 +81,10 @@ console 3 19 0
 
 Copy the contents of the file `README` in `fs.img` into the file `README_xv6.txt` in the host OS file system.
 ```
-opfs fs.img get README > REAMDE_xv6.txt
+$ opfs fs.img get README > REAMDE_xv6.txt
 ```
 
-### 2. `newfs`
+### 2. newfs
 The command `newfs` creates a new empty disk image file named _imgfile_.
 <pre>
 newfs <i>imgfile</i> <i>size</i> <i>ninodes</i> <i>nlog</i>
@@ -98,7 +106,7 @@ $ newfs fs0.img 1000 200 30
 # of data blocks: 954
 ```
 
-### 3. `modfs`
+### 3. modfs
 The command `modfs` provides potentially unsafe operations on an xv6 file system in the disk image file (_imgfile_).
 
 <pre>
