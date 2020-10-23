@@ -1,16 +1,13 @@
 opfs
 ========
-A set of simple utilities for manipulating xv6-riscv file system images
+A set of simple utilities for manipulating [xv6-riscv](https://github.com/mit-pdos/xv6-riscv) file system images
 
----
 ## Installation
 
     make
     make install
 
----
 ## Usage
-
 Opfs provides three commands: `opfs`, `newfs` and `modfs`.
 
 ### 1. `opfs`
@@ -35,7 +32,6 @@ _Command_ is one of the following:
 * `rmdir` _path_ : removes an empty directory specified by _path_
 
 #### Examples
-
 Displays the information of the file system in `fs.img`.
 ```
 $ opfs fs.img diskinfo
@@ -91,7 +87,6 @@ newfs <i>imgfile</i> <i>size</i> <i>ninodes</i> <i>nlog</i>
 * _nlog_ : number of log blocks
 
 #### Example
-
 Create a new empty disk image file named `fs0.img`.
 ```
 $ newfs fs0.img 1000 200 30
@@ -129,4 +124,4 @@ _Command_ is one of the following:
 * `dirent` _path_ _name_ [_val_] : the i-node number of the entry _name_ of the directory specified by _path_
 
 In each command, providing optional parameter _val_ modifies the specified value.
-Be aware that such modification may make the file system inconsistent.
+Be aware that such modification may break the consistency of the file system.
