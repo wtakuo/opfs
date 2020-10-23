@@ -6,6 +6,7 @@ GRTAGS
 GPATH
 *.img
 *.o
+.vscode/
 *~
 a.out
 .DS_Store
